@@ -1,11 +1,14 @@
-import { defineConnection } from "@opencomputer/agent";
+import { bearer, defineConnection, useSecret } from "@opencomputer/agent";
 
-// Unauthenticated for now: public repositories only (60 requests/hour on
-// GitHub's anonymous tier). A GITHUB_TOKEN secret gets attached when the
-// write path lands.
+// GITHUB_TOKEN is a fine-grained PAT scoped to the repositories this agent
+// reviews, with Pull requests: read/write. The platform attaches it at the
+// outbound edge; it never enters the agent runtime.
 export const github = defineConnection({
   id: "github-api",
   origin: "https://api.github.com",
-  methods: ["GET"],
+  methods: ["GET", "POST"],
   pathPrefix: "/repos/",
+  headers: {
+    Authorization: bearer(useSecret("GITHUB_TOKEN")),
+  },
 });

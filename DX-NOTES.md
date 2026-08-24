@@ -110,3 +110,52 @@ diggerhq/digger#2701 was substantive and grounded — it caught a GORM
 `Save`-vs-`Updates` overwrite risk and a missing-migration question, both
 real, both anchored to actual diff content. Model: claude-sonnet-4.6, stock
 instructions, no examples. The product's core loop delivers.
+
+## 011 — builtin-tools-ambient (gap, security)
+
+2026-08-24 — step 5-6 probing. The runtime ships a full ambient toolset the
+agent function never selected: asked to enumerate its tools, the agent listed
+read, write, shell, glob, grep, question, skill, subagent, webfetch,
+websearch, and execute ("run JavaScript in Code Mode"). Asked to fetch
+`https://example.com`, it did — via builtin `webfetch`, no connection
+declared, no tool attached in the render. So egress is open regardless of
+declared connections, and `useTool` selection does not bound what the model
+can do. The documented security story ("the platform validates destination,
+method, path… before attaching the credential") is true of credentials but
+silent about this: a prompt-injected agent can exfiltrate anything in its
+context or workspace to any host with stock tools. Docs describe capability
+selection as the model's boundary; the deployed behavior has no boundary.
+
+## 012 — usetool-never-registers (bug, blocking)
+
+2026-08-24 — step 5-6 probing. The documented code-defined tools flow does
+not function. `defineTool` + `useTool` exactly per tools.mdx: deploy
+succeeds, session runs, but the tool never exists at runtime — asked to call
+`get_pull_request` and forbidden from using shell/webfetch, the agent
+answered "There is no `get_pull_request` tool in my toolset". No deploy
+warning, no session error, nothing in logs. Instructions returned by the
+render DO apply (review structure was followed), so the render runs — its
+tool selections just go nowhere. This blocks the core design of this example
+(and means declared connections + managed secrets currently cannot be
+exercised through tools at all).
+
+## 013 — correction-008 (correction)
+
+2026-08-24. Entry 008's conclusion was wrong. Given 012, the first review
+session cannot have used `get_pull_request`/`get_diff`; it was produced by
+the ambient builtins (011) fetching GitHub directly. Whether an
+unauthenticated — or any — `defineConnection` egress path works is untested
+and untestable until 012 is fixed. The "worked" signal was the agent routing
+around my dead tools so smoothly the output was indistinguishable.
+
+## 014 — no-way-to-see-what-ran (gap, extends 009)
+
+2026-08-24. It took three probe sessions to discover 011-013, because no
+public surface shows tool activity after the fact: `session inspect` returns
+turn statuses only, `opencomputer logs --session` returned a single "runtime
+connected" line, and the live CLI stream prints bare names (`tool: webfetch`)
+for builtin tools only — the first review session printed nothing. A user
+cannot distinguish "my tool ran" from "the model routed around my broken
+tool"; that ambiguity is exactly how 008 went wrong. Session events with tool
+calls, arguments, and results — or at minimum names in `session inspect` —
+are a launch necessity.
