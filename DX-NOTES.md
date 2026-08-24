@@ -71,3 +71,13 @@ agent (which silently re-targets the same cloud agent).
 deployment digest, and dashboard URL printed. `npm run session -- "Say hi in
 exactly five words."` answered correctly on the first try. Zero config beyond
 login. This loop is genuinely good.
+
+## 007 — rename-is-a-noop (confirms 005)
+
+2026-08-24 — after step 3. Renamed the local agent `hello-world` →
+`pr-review` (directory + `project.ts`). The running watcher reported
+`Change detected … ✓ Development is already up to date.` — a byte-identical
+artifact. The local agent id is not part of the deployment digest or any
+cloud identity; only file contents count, and the first agent's name is
+discarded entirely. Consistent, but it means `project.ts` agent names are
+pure local bookkeeping, which nothing in the docs says.
