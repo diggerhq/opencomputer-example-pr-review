@@ -81,3 +81,32 @@ artifact. The local agent id is not part of the deployment digest or any
 cloud identity; only file contents count, and the first agent's name is
 discarded entirely. Consistent, but it means `project.ts` agent names are
 pure local bookkeeping, which nothing in the docs says.
+
+## 008 — unauth-connection-works (nice, probe)
+
+2026-08-24 — step 4 (read tools). `defineConnection` with **no `headers`** is
+accepted and outbound requests flow — an unauthenticated connection to
+`https://api.github.com` for public-repo reads works. Per-request headers on
+`connection.fetch(path, { headers: { Accept: "application/vnd.github.diff" } })`
+are honored (the diff media type came back). Neither behavior is documented:
+secrets.mdx only shows the authenticated form, and nothing says whether
+`RequestInit` headers pass through or which ones the egress filter would
+strip. Both worked; both deserve a sentence in the docs.
+
+## 009 — tool-activity-invisible-in-cli (friction)
+
+2026-08-24 — step 4. `npm run session -- "Review diggerhq/digger#2701"`
+prints only the final answer. Nothing shows whether `get_pull_request` /
+`get_diff` actually ran, how long they took, or what they returned — I had to
+verify the review against the real PR to rule out hallucination. The
+information exists (`session inspect`, `logs`, dashboard), but the
+development-loop default gives no sign of tool activity. A one-line
+`→ get_diff …` trace in session output would close it.
+
+## 010 — first-real-review-quality (nice)
+
+2026-08-24 — step 4. First attempt at a real task: the dry-run review of
+diggerhq/digger#2701 was substantive and grounded — it caught a GORM
+`Save`-vs-`Updates` overwrite risk and a missing-migration question, both
+real, both anchored to actual diff content. Model: claude-sonnet-4.6, stock
+instructions, no examples. The product's core loop delivers.
