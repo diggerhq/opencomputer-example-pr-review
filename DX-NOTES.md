@@ -229,3 +229,29 @@ So the launch-blocking problem is precisely the silent-death modes
 an agent log line with connection id, method, and path. Once tools run,
 the platform-side audit trail for outbound requests exists — it is the
 CLI session surface (009/014) that hides it.
+
+## 020 — egress-no-user-agent (bug)
+
+2026-08-25. Managed egress sends outbound requests with no `User-Agent`
+header, and GitHub rejects every such request with 403 "Request forbidden
+by administrative rules". Every GitHub call through a managed connection
+fails regardless of token validity — the token tested 200 directly on the
+same endpoint. Because the default error surface discards response bodies
+(and the platform surfaces nothing), this presented identically to a
+token-scope problem and took a body-preserving code change to diagnose.
+Workaround: declare a static `"User-Agent"` header in `defineConnection`
+(static headers pass through). Platform fix: the edge should set a default
+User-Agent on all managed egress.
+
+## 021 — full-loop-live (nice)
+
+2026-08-25. With the User-Agent workaround, the complete designed loop
+ran live: `Review diggerhq/opencomputer-example-pr-review#1` → render →
+`get_pull_request` + `get_diff` through the managed connection (secret
+attached at the edge) → substantive dry-run review whose top finding was
+genuinely correct (this repo's own RFC 7807 heuristic is over-broad);
+then with explicit "post the review" phrasing the live gate attached
+`post_review` and the agent posted a COMMENTED review with 3 inline
+comments on the PR. The example now demonstrates every launch claim:
+reactive render, capability gating, code tools, managed secrets,
+fail-closed egress, live GitHub write.
