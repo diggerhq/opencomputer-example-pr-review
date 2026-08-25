@@ -159,3 +159,73 @@ cannot distinguish "my tool ran" from "the model routed around my broken
 tool"; that ambiguity is exactly how 008 went wrong. Session events with tool
 calls, arguments, and results — or at minimum names in `session inspect` —
 are a launch necessity.
+
+## 015 — root-cause-artifact-kills-plugin (bug, blocking; supersedes 012's mechanism)
+
+2026-08-25. Reproduced the full production runtime locally (pinned
+`@opencode-ai/cli@0.0.0-next-17055` + the platform's reactive plugin built
+from source + our byte-identical deployed artifact — digests match). The
+tools machinery is fine; the failure chain is:
+
+1. The CLI compiles each tool file standalone, rewriting only
+   `@opencomputer/agent` imports. Our `import { github } from "../github"`
+   compiled to a dangling specifier — `github.js` is simply not in the
+   artifact. `ERR_MODULE_NOT_FOUND` at load.
+2. The runtime plugin loads tool modules during setup; the import error
+   rejects setup **before** the reactive machinery initializes, so one bad
+   tool module kills renders, instructions, code tools, and builtin
+   filtering for the whole session.
+3. The engine swallows the plugin setup rejection: zero log output, zero
+   session events, deploy reports success.
+
+Instrumented marks show exactly `module-top → setup-entered →
+before-registerCodeTools → ∅`. Fix directions: per-module isolation in the
+plugin, loud plugin-failure surfacing, and build-time rejection (or
+bundling) of unsupported imports.
+
+## 016 — docs-pattern-produces-broken-artifact (bug, blocking)
+
+2026-08-25. It is not just sibling modules: the **documented** tools
+pattern breaks the same way. tools.mdx has `agent.ts` import
+`"./tools/lookup-order"` — extensionless. Compiled output keeps the
+specifier verbatim and the runtime loads it as Node ESM, so the agent
+entry itself fails: `Cannot find module '.../tools/get-pull-request'`.
+Every project following the docs' multi-file layout ships an artifact
+whose agent function cannot load. Workaround: always import with the
+`.js` suffix.
+
+## 017 — connections-silently-dropped (bug)
+
+2026-08-25. `defineConnection` is only discovered in `agent.ts` and
+`tools/*.ts`. Our connection lived in `github.ts` (a sibling module —
+natural for sharing between tools) and the manifest came out
+`connections: []`, silently. No build warning. Combined with 015, the
+failure was doubly invisible. Workaround: define connections in the same
+file as the tools that use them.
+
+## 018 — the-model-works-when-alive (nice; resolves 011, revises 012)
+
+2026-08-25. After restructuring (one self-contained
+`tools/github-tools.ts`, `.js` import suffix), everything the design
+promises works live in development:
+
+- `tool: get_pull_request` executes on the real platform;
+- the render's tool selection is enforced — asked to fetch example.com,
+  the agent has **no webfetch/shell/builtins at all**, only the two
+  review tools; the conditional `post_review` gate holds (not exposed
+  without live-post phrasing). **011 was a symptom of the dead plugin,
+  not a separate egress hole** — with a working artifact the boundary is
+  real;
+- managed egress fails closed: with `GITHUB_TOKEN` unset, the connection
+  returns 409 `secret_unavailable` ("missing or not allowed for this
+  connection") — design 016 behaving exactly as written.
+
+So the launch-blocking problem is precisely the silent-death modes
+(015/016/017), not the security model.
+
+## 019 — egress-observability (nice)
+
+2026-08-25. The edge records `egress.request` both as a session event and
+an agent log line with connection id, method, and path. Once tools run,
+the platform-side audit trail for outbound requests exists — it is the
+CLI session surface (009/014) that hides it.
