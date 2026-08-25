@@ -1,7 +1,12 @@
 import { useInput, useModel, useTool } from "@opencomputer/agent";
-import { getPullRequest } from "./tools/get-pull-request";
-import { getDiff } from "./tools/get-diff";
-import { postReview } from "./tools/post-review";
+// The .js suffix is required: the compiler keeps specifiers verbatim and the
+// runtime loads compiled modules as Node ESM, where extensionless relative
+// imports fail.
+import {
+  getPullRequest,
+  getDiff,
+  postReview,
+} from "./tools/github-tools.js";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
