@@ -20,12 +20,9 @@ platform at its outbound edge and never enters the agent runtime.
   -> post_review                    (only when the request says to post)
 ```
 
-Three files carry the whole design.
-
-**`opencomputer/agents/pr-review/agent.ts`** — the agent function. It is not
-a loop: it is a synchronous render that runs before every model step, reads
-the current input, and decides what the model gets for that step — the
-instructions and the tool set:
+**`opencomputer/agents/pr-review/agent.ts`** — the agent function. Not a
+loop: a synchronous render, called before every model step, that reads the
+current input and selects the instructions and tool set for that step:
 
 ```tsx
 export default function Agent() {
@@ -42,14 +39,14 @@ export default function Agent() {
 }
 ```
 
-There is no separate permissions layer: dry-run-by-default is one `if`
+There is no separate permission layer: dry-run-by-default is one `if`
 statement. A tool the render does not select does not exist for that model
 step — the runtime deletes it from the toolset, so a prompt cannot talk the
 model into posting.
 
 **`opencomputer/agents/pr-review/tools/github-tools.ts`** — one declared
-HTTP connection and the three typed tools that use it. The connection is the
-agent's entire reach:
+HTTP connection and the three typed tools that use it. The connection
+defines all outbound access:
 
 ```tsx
 export const github = defineConnection({
@@ -70,8 +67,8 @@ token never enters the agent runtime. `get_pull_request` and `get_diff`
 read; `post_review` writes one `COMMENT` review and falls back to a
 summary-only review when GitHub rejects an inline anchor.
 
-**The managed runtime** supplies everything the repository does not: the
-durable session and turn queue, the model/tool loop that calls the render
+**The managed runtime** provides the rest: the durable session and turn
+queue, the model/tool loop that calls the render
 before each step, and immutable content-addressed deployments —
 `npm run deploy -- --watch` publishes one per save and advances the
 Development alias, while running sessions stay pinned to the deployment
