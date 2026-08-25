@@ -3,6 +3,7 @@ import {
   defineConnection,
   defineTool,
   useSecret,
+  type DataValue,
 } from "@opencomputer/agent";
 
 // One self-contained module: the compiler bundles each tool file standalone
@@ -28,19 +29,35 @@ export const github = defineConnection({
 // Failed requests come from two layers: GitHub itself, or the platform's
 // managed egress rejecting the request before it leaves (RFC 7807 problem
 // body, e.g. secret_unavailable). Surface which one so the error is
-// actionable instead of blaming GitHub for everything.
-async function describeFailure(response: Response, path: string) {
+// actionable instead of blaming GitHub for everything. Only called on
+// !response.ok, so consuming the body here never races the success path.
+export async function describeFailure(response: Response, path: string) {
   const body = await response.text().catch(() => "");
   let detail = "";
   try {
-    const parsed = JSON.parse(body);
-    detail = parsed.title ?? parsed.message ?? "";
-    if (parsed.type || parsed.title) {
-      return `managed egress rejected ${path}: ${response.status} ${detail}`.trim();
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed === "object" && parsed !== null) {
+      const problem = parsed as Record<string, unknown>;
+      // RFC 7807 is identified by its `type` member; `title` alone also
+      // appears in ordinary GitHub error bodies.
+      if (typeof problem.type === "string" && problem.type !== "") {
+        detail =
+          typeof problem.detail === "string"
+            ? problem.detail
+            : typeof problem.title === "string"
+              ? problem.title
+              : "";
+        return `managed egress rejected ${path}: ${response.status} ${detail}`.trim();
+      }
+      detail =
+        typeof problem.message === "string"
+          ? problem.message
+          : body.slice(0, 200);
     }
   } catch {
     detail = body.slice(0, 200);
   }
+  detail = detail.trim();
   return `GitHub returned ${response.status} for ${path}${detail ? `: ${detail}` : ""}`;
 }
 
@@ -58,7 +75,7 @@ export const getPullRequest = defineTool({
     required: ["owner", "repo", "number"],
     additionalProperties: false,
   },
-  async run({ input }) {
+  async run({ input }): Promise<DataValue> {
     const path = `/repos/${input.owner}/${input.repo}/pulls/${input.number}`;
     const response = await github.fetch(path);
     if (!response.ok) {
@@ -97,7 +114,7 @@ export const getDiff = defineTool({
     required: ["owner", "repo", "number"],
     additionalProperties: false,
   },
-  async run({ input }) {
+  async run({ input }): Promise<DataValue> {
     const path = `/repos/${input.owner}/${input.repo}/pulls/${input.number}`;
     const response = await github.fetch(path, {
       headers: { Accept: "application/vnd.github.diff" },
@@ -145,23 +162,26 @@ export const postReview = defineTool({
     required: ["owner", "repo", "number", "body"],
     additionalProperties: false,
   },
-  async run({ input }) {
+  async run({ input }): Promise<DataValue> {
     const path = `/repos/${input.owner}/${input.repo}/pulls/${input.number}/reviews`;
+    const reviewBody = typeof input.body === "string" ? input.body : "";
     const comments = Array.isArray(input.comments)
-      ? input.comments.map((c) => ({ ...c, side: "RIGHT" }))
+      ? (input.comments as ReadonlyArray<Record<string, DataValue>>).map(
+          (c) => ({ ...c, side: "RIGHT" }),
+        )
       : [];
-    const post = (payload) =>
+    const post = (payload: DataValue) =>
       github.fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
-    let response = await post({ event: "COMMENT", body: input.body, comments });
+    let response = await post({ event: "COMMENT", body: reviewBody, comments });
     if (response.status === 422 && comments.length > 0) {
       // Inline anchors can be rejected (renamed files, off-diff lines).
       // Fall back to a summary-only review rather than losing the review.
-      response = await post({ event: "COMMENT", body: input.body });
+      response = await post({ event: "COMMENT", body: reviewBody });
       if (response.ok) {
         return { posted: true, inlineComments: 0, fallback: "summary-only" };
       }

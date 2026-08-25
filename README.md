@@ -1,81 +1,148 @@
-# PR Review Agent
+# OpenComputer PR review agent
 
-An [OpenComputer Serverless Agent](https://opencomputer.dev) that reviews GitHub
-pull requests. When a PR opens or updates, it reads the diff, reviews the change,
-and posts a review: inline comments where it is confident, a summary comment
-otherwise.
+This example reviews GitHub pull requests with an OpenComputer Serverless
+Agent. Given a PR reference, the agent fetches the metadata and diff through a
+managed GitHub connection, reviews the change for correctness, and — only when
+asked to — posts the result as a `COMMENT` review with inline comments.
 
-Built from scratch as a real-user exercise. The commit history is deliberately
-granular — every step is a small, focused change, so the build is reviewable and
-forkable from any point.
-
-## Target behavior
-
-- Triggered by a GitHub `pull_request` event (`opened`, `synchronize`,
-  `reopened`), or manually with a PR reference ("review acme/widgets#42").
-- Fetches PR metadata and the diff through the GitHub API using an OpenComputer
-  managed secret — the token is attached at the platform's outbound edge and
-  never enters the agent runtime, prompts, or source.
-- Reviews for correctness first: bugs, missed edge cases, broken contracts.
-  Style feedback only where the repository states a convention.
-- Posts one review per triggering event: inline comments anchored to diff lines
-  plus a short verdict summary. Defaults to `COMMENT` — it does not approve or
-  request changes unless configured to.
-- Dry-run mode (the default until wiring is proven): produce the full review as
-  session output without posting anything to GitHub.
+The agent has exactly three capabilities, all defined in this repository. It
+cannot approve or request changes, merge, push, or reach any host other than
+`api.github.com` under `/repos/`. The GitHub token is attached by the
+platform at its outbound edge and never enters the agent runtime.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    GH[GitHub pull_request event] --> WH[Agent webhook]
-    User[Manual message / playground] --> S
-    WH --> S[Fresh durable session]
-    S --> R[Agent render: instructions, model, tools for this input]
-    R --> T1[get_pull_request]
-    R --> T2[get_diff]
-    R --> T3[post_review]
-    T1 & T2 & T3 --> C[Managed connection to api.github.com]
-    C --> Review[Review posted on the PR]
+```text
+"Review acme/widgets#42"            (session, playground, or webhook)
+  -> agent render: instructions + tool selection for this input
+  -> get_pull_request, get_diff     (managed connection, GET)
+  -> review as session output       (default: dry run)
+  -> post_review                    (only when the request says to post)
 ```
 
-In Serverless Agents terms:
+The render function in `opencomputer/agents/pr-review/agent.ts` attaches the
+read tools on every turn and `post_review` only when the input asks for a live
+post. Tools the render does not select do not exist for that model step.
 
-- `opencomputer/agents/pr-review/agent.ts` default-exports a synchronous render
-  function. Per input it selects the model, instructions, and tools — the write
-  tool (`post_review`) is only attached when the input asks for a live review.
-- `defineConnection` declares the only outbound destination:
-  `https://api.github.com`, `GET`/`POST`, path prefix `/repos/`, authorized with
-  `bearer(useSecret("GITHUB_TOKEN"))`.
-- Code-defined tools fetch PR metadata, the diff, and post the review through
-  that connection.
-- An agent webhook (operational config, not source) gives GitHub a stable URL;
-  each delivery starts a fresh durable session, deduplicated by idempotency key.
+## Prerequisites
 
-## Open questions going in
+- Node.js 22 or newer
+- An OpenComputer account
+- A GitHub fine-grained personal access token scoped to the repositories the
+  agent should review, with **Pull requests: read and write** and
+  **Contents: read**
 
-- GitHub webhook deliveries authenticate with an HMAC signature
-  (`X-Hub-Signature-256`) and cannot set an `Authorization: Bearer` header;
-  OpenComputer agent webhooks expect a bearer token. Expect either a relay in
-  between or a product answer. Resolved in step 7.
-- Large PRs: one raw diff may not fit a review turn well; may need per-file
-  tools instead of a single `get_diff`.
-- Inline comment anchoring (side/line) on the GitHub reviews API is fiddly;
-  keep a summary-only fallback.
+## 1. Run the agent in Development
 
-## Build plan
+```bash
+npm install
+npm run opencomputer -- login
+npm run deploy -- --watch
+```
 
-1. **Sketch** — this README.
-2. **Scaffold** — `npx @opencomputer/cli init .`
-3. **First deploy** — `npm run deploy -- --watch`, playground smoke test.
-4. **Read tools** — GitHub connection + `get_pull_request`, `get_diff`.
-5. **Reviewer** — review instructions, dry-run review as session output.
-6. **Write tool** — `post_review`, still dry-run by default.
-7. **Webhook** — GitHub → agent webhook wiring, idempotent per delivery.
-8. **Hardening** — big diffs, `synchronize` re-reviews, failure behavior.
+The first watched deployment links or creates the OpenComputer project and
+prints its dashboard URL. Keep it running while developing; saving a file
+deploys to Development.
 
-## DX log
+## 2. Configure the GitHub token
 
-Developer-experience observations — friction, gaps, bugs, pleasant surprises —
-are recorded in [DX-NOTES.md](DX-NOTES.md) as they happen, from the perspective
-of a new user following only the public docs.
+```bash
+npm run opencomputer -- secrets set GITHUB_TOKEN
+```
+
+The CLI reads the value from a hidden prompt and allows it only for
+`https://api.github.com`. The platform validates origin, method, and path
+prefix before attaching the token to an outbound request; a request the
+connection does not declare is rejected before it leaves.
+
+The token's fine-grained grant is the agent's blast radius: it can read and
+review exactly the repositories you selected when creating the token.
+
+## 3. Review a pull request
+
+```bash
+npm run session -- "Review acme/widgets#42"
+```
+
+The default is a dry run: the review — a verdict paragraph plus numbered
+findings anchored to files and lines from the diff — is session output, and
+nothing is posted to GitHub.
+
+## 4. Post a review
+
+```bash
+npm run session -- "Review acme/widgets#42 and post the review on the PR."
+```
+
+With an explicit ask to post, the render attaches `post_review` and the agent
+submits one `COMMENT` review: the verdict and findings as the body, plus
+inline comments for findings it can anchor to new-side diff lines. Inline
+anchors rejected by GitHub fall back to a summary-only review.
+
+## 5. Trigger from another system
+
+Create a stable authenticated ingress for the agent:
+
+```bash
+npm run opencomputer -- webhooks create pr-review-ingress \
+  --agent current \
+  --environment development
+```
+
+The command prints the invocation URL and bearer token once. Each delivery
+starts a fresh durable session against the active Development deployment:
+
+```bash
+curl -X POST '<webhook url>' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: <delivery id>' \
+  -d '{"text": "Review acme/widgets#42"}'
+```
+
+The response is HTTP 202 with the session URL; the review proceeds
+asynchronously. Retrying with the same idempotency key returns the original
+session instead of starting a second review.
+
+GitHub itself cannot call this URL directly — GitHub webhooks sign with an
+HMAC header and cannot send a bearer token. To review PRs on open, forward
+the event from a small relay such as a GitHub Actions `pull_request` job that
+holds the webhook URL and token as repository secrets.
+
+## Repository layout
+
+- `opencomputer/agents/pr-review/agent.ts` — the render function: model,
+  instructions, and per-input tool selection.
+- `opencomputer/agents/pr-review/tools/github-tools.ts` — the GitHub
+  connection and all three tools in one module. The compiler bundles each
+  tool file standalone and supports no relative imports besides
+  `@opencomputer/agent`, so the connection and its tools live together, and
+  `agent.ts` imports the module with an explicit `.js` suffix.
+- `test/github-tools.test.ts` — unit tests for error attribution and the
+  tool input schemas.
+
+## Develop and verify
+
+```bash
+npm run build   # type-check
+npm test
+```
+
+## Current limits
+
+- Diffs are truncated at 150,000 characters; the tool result says so and
+  reports the full size.
+- Reviews are `COMMENT` events only. Approval and request-changes are
+  deliberately out of scope.
+- One PR per request. Multi-PR sweeps and re-review on push are not built.
+- GitHub-signed webhook ingress needs the relay described above.
+
+## Development log
+
+This example was built against the live platform as a first-user exercise.
+[DX-NOTES.md](DX-NOTES.md) records every friction point, bug, and verified
+behavior encountered along the way, in order.
+
+## License
+
+MIT
