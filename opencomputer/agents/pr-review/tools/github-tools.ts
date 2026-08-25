@@ -19,6 +19,9 @@ export const github = defineConnection({
   pathPrefix: "/repos/",
   headers: {
     Authorization: bearer(useSecret("GITHUB_TOKEN")),
+    // GitHub rejects any API request without a User-Agent (403), and the
+    // platform's managed egress does not add one by default.
+    "User-Agent": "opencomputer-pr-review-agent",
   },
 });
 
