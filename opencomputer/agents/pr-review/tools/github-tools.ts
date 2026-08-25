@@ -22,6 +22,25 @@ export const github = defineConnection({
   },
 });
 
+// Failed requests come from two layers: GitHub itself, or the platform's
+// managed egress rejecting the request before it leaves (RFC 7807 problem
+// body, e.g. secret_unavailable). Surface which one so the error is
+// actionable instead of blaming GitHub for everything.
+async function describeFailure(response: Response, path: string) {
+  const body = await response.text().catch(() => "");
+  let detail = "";
+  try {
+    const parsed = JSON.parse(body);
+    detail = parsed.title ?? parsed.message ?? "";
+    if (parsed.type || parsed.title) {
+      return `managed egress rejected ${path}: ${response.status} ${detail}`.trim();
+    }
+  } catch {
+    detail = body.slice(0, 200);
+  }
+  return `GitHub returned ${response.status} for ${path}${detail ? `: ${detail}` : ""}`;
+}
+
 export const getPullRequest = defineTool({
   name: "get_pull_request",
   description:
@@ -40,7 +59,7 @@ export const getPullRequest = defineTool({
     const path = `/repos/${input.owner}/${input.repo}/pulls/${input.number}`;
     const response = await github.fetch(path);
     if (!response.ok) {
-      return { error: `GitHub returned ${response.status} for ${path}` };
+      return { error: await describeFailure(response, path) };
     }
     const pr = await response.json();
     return {
@@ -81,7 +100,7 @@ export const getDiff = defineTool({
       headers: { Accept: "application/vnd.github.diff" },
     });
     if (!response.ok) {
-      return { error: `GitHub returned ${response.status} for ${path}` };
+      return { error: await describeFailure(response, path) };
     }
     const full = await response.text();
     const truncated = full.length > MAX_DIFF_CHARS;
@@ -145,7 +164,7 @@ export const postReview = defineTool({
       }
     }
     if (!response.ok) {
-      return { error: `GitHub returned ${response.status} for ${path}` };
+      return { error: await describeFailure(response, path) };
     }
     const review = await response.json();
     return {
