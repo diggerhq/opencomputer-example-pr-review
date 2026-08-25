@@ -20,9 +20,62 @@ platform at its outbound edge and never enters the agent runtime.
   -> post_review                    (only when the request says to post)
 ```
 
-The render function in `opencomputer/agents/pr-review/agent.ts` attaches the
-read tools on every turn and `post_review` only when the input asks for a live
-post. Tools the render does not select do not exist for that model step.
+Three files carry the whole design.
+
+**`opencomputer/agents/pr-review/agent.ts`** — the agent function. It is not
+a loop: it is a synchronous render that runs before every model step, reads
+the current input, and decides what the model gets for that step — the
+instructions and the tool set:
+
+```tsx
+export default function Agent() {
+  const input = useInput();
+  const live = /\bpost\b.*\breview\b/i.test(input.text ?? "");
+
+  useModel("anthropic/claude-sonnet-4.6");
+  useTool(getPullRequest);
+  useTool(getDiff);
+  if (live) {
+    useTool(postReview);
+  }
+  // returns the review instructions for this render
+}
+```
+
+There is no separate permissions layer: dry-run-by-default is one `if`
+statement. A tool the render does not select does not exist for that model
+step — the runtime deletes it from the toolset, so a prompt cannot talk the
+model into posting.
+
+**`opencomputer/agents/pr-review/tools/github-tools.ts`** — one declared
+HTTP connection and the three typed tools that use it. The connection is the
+agent's entire reach:
+
+```tsx
+export const github = defineConnection({
+  id: "github-api",
+  origin: "https://api.github.com",
+  methods: ["GET", "POST"],
+  pathPrefix: "/repos/",
+  headers: {
+    Authorization: bearer(useSecret("GITHUB_TOKEN")),
+    "User-Agent": "opencomputer-pr-review-agent",
+  },
+});
+```
+
+Tools call `github.fetch("/repos/…")`; the platform validates origin,
+method, and path prefix, then attaches the secret at its outbound edge. The
+token never enters the agent runtime. `get_pull_request` and `get_diff`
+read; `post_review` writes one `COMMENT` review and falls back to a
+summary-only review when GitHub rejects an inline anchor.
+
+**The managed runtime** supplies everything the repository does not: the
+durable session and turn queue, the model/tool loop that calls the render
+before each step, and immutable content-addressed deployments —
+`npm run deploy -- --watch` publishes one per save and advances the
+Development alias, while running sessions stay pinned to the deployment
+they started on.
 
 ## Prerequisites
 
