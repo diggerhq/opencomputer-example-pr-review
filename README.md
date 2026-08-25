@@ -10,6 +10,9 @@ cannot approve or request changes, merge, push, or reach any host other than
 `api.github.com` under `/repos/`. The GitHub token is attached by the
 platform at its outbound edge and never enters the agent runtime.
 
+[Docs walkthrough](https://docs.opencomputer.dev/agents/examples/pr-review) ·
+[Serverless Agents overview](https://docs.opencomputer.dev/agents/overview)
+
 ## How it works
 
 ```text
@@ -20,7 +23,8 @@ platform at its outbound edge and never enters the agent runtime.
   -> post_review                    (only when the request says to post)
 ```
 
-**`opencomputer/agents/pr-review/agent.ts`** — the agent function. Not a
+**`opencomputer/agents/pr-review/agent.ts`** — the
+[agent function](https://docs.opencomputer.dev/agents/reactive-agents). Not a
 loop: a synchronous render, called before every model step, that reads the
 current input and selects the instructions and tool set for that step:
 
@@ -45,7 +49,7 @@ step — the runtime removes it from the toolset, so input text cannot enable
 posting.
 
 **`opencomputer/agents/pr-review/tools/github-tools.ts`** — one declared
-HTTP connection and the three typed tools that use it. The connection
+HTTP connection and the three typed [tools](https://docs.opencomputer.dev/agents/tools) that use it. The connection
 defines all outbound access:
 
 ```tsx
@@ -71,8 +75,8 @@ summary-only review when GitHub rejects an inline anchor.
 queue, the model/tool loop that calls the render
 before each step, and immutable content-addressed deployments —
 `npm run deploy -- --watch` publishes one per save and advances the
-Development alias, while running sessions stay pinned to the deployment
-they started on.
+Development alias, while running sessions stay pinned to the
+[deployment](https://docs.opencomputer.dev/agents/deployments) they started on.
 
 ## Prerequisites
 
@@ -100,7 +104,8 @@ deploys to Development.
 npm run opencomputer -- secrets set GITHUB_TOKEN
 ```
 
-The CLI reads the value from a hidden prompt and allows it only for
+The CLI reads the value from a hidden prompt and stores it as a
+[managed secret](https://docs.opencomputer.dev/agents/secrets) allowed only for
 `https://api.github.com`. The platform validates origin, method, and path
 prefix before attaching the token to an outbound request; a request the
 connection does not declare is rejected before it leaves.
@@ -131,7 +136,8 @@ anchors rejected by GitHub fall back to a summary-only review.
 
 ## 5. Trigger from another system
 
-Create a stable authenticated ingress for the agent:
+Create a stable authenticated ingress for the agent — an
+[agent webhook](https://docs.opencomputer.dev/agents/webhooks):
 
 ```bash
 npm run opencomputer -- webhooks create pr-review-ingress \
