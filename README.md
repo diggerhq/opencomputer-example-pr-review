@@ -41,8 +41,8 @@ export default function Agent() {
 
 There is no separate permission layer: dry-run-by-default is one `if`
 statement. A tool the render does not select does not exist for that model
-step — the runtime deletes it from the toolset, so a prompt cannot talk the
-model into posting.
+step — the runtime removes it from the toolset, so input text cannot enable
+posting.
 
 **`opencomputer/agents/pr-review/tools/github-tools.ts`** — one declared
 HTTP connection and the three typed tools that use it. The connection
@@ -105,8 +105,8 @@ The CLI reads the value from a hidden prompt and allows it only for
 prefix before attaching the token to an outbound request; a request the
 connection does not declare is rejected before it leaves.
 
-The token's fine-grained grant is the agent's blast radius: it can read and
-review exactly the repositories you selected when creating the token.
+The agent's repository access equals the token's fine-grained grant: it can
+read and review only the repositories selected when the token was created.
 
 ## 3. Review a pull request
 
@@ -154,10 +154,10 @@ The response is HTTP 202 with the session URL; the review proceeds
 asynchronously. Retrying with the same idempotency key returns the original
 session instead of starting a second review.
 
-GitHub itself cannot call this URL directly — GitHub webhooks sign with an
-HMAC header and cannot send a bearer token. To review PRs on open, forward
-the event from a small relay such as a GitHub Actions `pull_request` job that
-holds the webhook URL and token as repository secrets.
+GitHub cannot call this URL directly — GitHub webhooks sign with an HMAC
+header and cannot send a bearer token. Reviewing PRs on open requires a
+relay, for example a GitHub Actions `pull_request` job that holds the
+webhook URL and token as repository secrets.
 
 ## Repository layout
 
