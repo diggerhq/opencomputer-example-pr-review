@@ -32,7 +32,7 @@ with 4 inline comments). The old oc-demo-webapp repo is archived.
     npx @opencomputer/cli init .
     # open opencomputer/agents/hello-world/agent.ts — 8 lines
     npm install
-    npm run deploy -- --watch --create-project pr-reviewer
+    npx opencomputer deploy --watch --create-project pr-reviewer
 
 Say: deployed durable agent backend; no infra. Dashboard URL prints.
 
@@ -47,7 +47,7 @@ attaches the token at its edge — it never enters the agent runtime.
 
 1:30 — the one wait:
 
-    npm run session -- "Review diggerhq/opencomputer-example-pr-review#2 and post the review on the PR."
+    npx opencomputer session "Review diggerhq/opencomputer-example-pr-review#2 and post the review on the PR."
 
 Narrate over the tool lines: two read tools, then post_review; posting
 exists only because the request asked — dry run is the default.
@@ -64,7 +64,8 @@ Say: CI curls that URL and every PR gets this review with no human.
 
 - Session hangs >90s: switch to the fallback terminal and run the same
   command there (its project secret is the same PAT, so it works
-  identically), or show PR #3's posted review: "one it did earlier".
+  identically; `npm run session --` and `npx opencomputer session` are the
+  same binary), or show PR #3's posted review: "one it did earlier".
 - Deploy fails: fallback terminal is already deployed; continue from 1:30.
 - Review misses planted bugs: point at whatever it did find — the flow is
   the demo.
