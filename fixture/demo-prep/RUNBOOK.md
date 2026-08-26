@@ -11,10 +11,11 @@ with 4 inline comments). The old oc-demo-webapp repo is archived.
 ## Preflight (before the demo)
 
 - [ ] `npx opencomputer whoami` — logged in as the demo account.
-- [ ] A fine-grained PAT scoped to `diggerhq/opencomputer-example-pr-review`
-      (Pull requests: R/W) in the clipboard manager.
+- [ ] The fine-grained PAT (scoped to this repo, Pull requests: R/W) is at
+      `~/.oc-demo-pat` (mode 600). Revoke it after the demo.
 - [ ] Empty dir ready: `rm -rf ~/demo && mkdir ~/demo`.
-- [ ] This folder's path handy: `<this repo>/fixture/demo-prep`.
+- [ ] This folder's path handy:
+      `~/Digger/_ws_opencomputer/opencomputer-example-pr-review/fixture/demo-prep`.
 - [ ] Browser tabs: example repo PR #2 (Files changed), and PR #3's
       posted review as the "one it did earlier" fallback.
 - [ ] Fallback terminal: `~/Digger/_ws_opencomputer/opencomputer-example-pr-review`
@@ -38,9 +39,9 @@ Say: deployed durable agent backend; no infra. Dashboard URL prints.
 
 0:45 — new terminal pane, same dir:
 
-    cp -r <this repo>/fixture/demo-prep/snippets/. opencomputer/agents/hello-world/
+    cp -r ~/Digger/_ws_opencomputer/opencomputer-example-pr-review/fixture/demo-prep/snippets/. opencomputer/agents/hello-world/
     # watcher redeploys on save; show github-tools.ts while it does
-    npx opencomputer secrets set GITHUB_TOKEN   # paste PAT
+    npx opencomputer secrets set GITHUB_TOKEN < ~/.oc-demo-pat
 
 Say: the connection declares the only reachable host/path; the platform
 attaches the token at its edge — it never enters the agent runtime.
