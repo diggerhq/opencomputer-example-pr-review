@@ -3,3 +3,4 @@ dist/
 .opencomputer/
 .env
 .env.local
+/demo-*/

@@ -13,9 +13,10 @@ with 4 inline comments). The old oc-demo-webapp repo is archived.
 - [ ] `npx opencomputer whoami` — logged in as the demo account.
 - [ ] The fine-grained PAT (scoped to this repo, Pull requests: R/W) is at
       `~/.oc-demo-pat` (mode 600). Revoke it after the demo.
-- [ ] Empty dir ready: `rm -rf ~/demo && mkdir ~/demo`.
-- [ ] This folder's path handy:
-      `~/Digger/_ws_opencomputer/opencomputer-example-pr-review/fixture/demo-prep`.
+- [ ] Fresh demo dir in the repo root: `mkdir demo-01 && cd demo-01`
+      (next session: demo-02, …; `demo-*/` is gitignored).
+- [ ] Snippets are at `../fixture/demo-prep/snippets` relative to the
+      demo dir.
 - [ ] Browser tabs: example repo PR #2 (Files changed), and PR #3's
       posted review as the "one it did earlier" fallback.
 - [ ] Fallback terminal: `~/Digger/_ws_opencomputer/opencomputer-example-pr-review`
@@ -28,7 +29,7 @@ with 4 inline comments). The old oc-demo-webapp repo is archived.
 
 ## Script
 
-0:00 — in `~/demo`:
+0:00 — in the fresh `demo-NN` dir:
 
     npx @opencomputer/cli init .
     # open opencomputer/agents/hello-world/agent.ts — 8 lines
@@ -39,7 +40,7 @@ Say: deployed durable agent backend; no infra. Dashboard URL prints.
 
 0:45 — new terminal pane, same dir:
 
-    cp -r ~/Digger/_ws_opencomputer/opencomputer-example-pr-review/fixture/demo-prep/snippets/. opencomputer/agents/hello-world/
+    cp -r ../fixture/demo-prep/snippets/. opencomputer/agents/hello-world/
     # watcher redeploys on save; show github-tools.ts while it does
     npx opencomputer secrets set GITHUB_TOKEN < ~/.oc-demo-pat
 
