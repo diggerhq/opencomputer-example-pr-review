@@ -24,7 +24,9 @@ app.get("/orders/:id", (req, res) => {
 });
 
 app.get("/customers/:customerId/orders", (req, res) => {
-  res.json(listOrders(req.params.customerId));
+  const page = Number(req.query.page ?? 1);
+  const pageSize = Number(req.query.pageSize ?? 20);
+  res.json(listOrders(req.params.customerId, page, pageSize));
 });
 
 const port = Number(process.env.PORT ?? 3000);
