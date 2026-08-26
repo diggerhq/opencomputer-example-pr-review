@@ -119,6 +119,14 @@ read and review only the repositories selected when the token was created.
 npm run session -- "Review acme/widgets#42"
 ```
 
+This repository includes a fixture app (`fixture/`, a small Express orders
+API) and seeded pull requests that change it, each with planted bugs. Try
+one:
+
+```bash
+npm run session -- "Review diggerhq/opencomputer-example-pr-review#2"
+```
+
 The default is a dry run: the review — a verdict paragraph plus numbered
 findings anchored to files and lines from the diff — is session output, and
 nothing is posted to GitHub.
@@ -176,6 +184,8 @@ webhook URL and token as repository secrets.
   `agent.ts` imports the module with an explicit `.js` suffix.
 - `test/github-tools.test.ts` — unit tests for error attribution and the
   tool input schemas.
+- `fixture/` — the orders API the seeded pull requests change; a stable
+  review target for trying the agent.
 
 ## Develop and verify
 
