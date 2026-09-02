@@ -1,0 +1,15 @@
+schema = 1
+
+[template]
+name = "Pull Request Reviewer"
+description = "Review GitHub pull requests for correctness and post comments only when explicitly requested."
+documentation = "https://docs.opencomputer.dev/agents/examples/pr-review"
+default_project_name = "pr-review-agent"
+
+[template.first_run]
+agent = "pr-review"
+prompt = "Review diggerhq/opencomputer-example-pr-review#2 as a dry run."
+
+[template.secrets.GITHUB_TOKEN]
+description = "Fine-grained GitHub token with Contents read and Pull requests read/write access."
+documentation = "https://github.com/settings/personal-access-tokens"

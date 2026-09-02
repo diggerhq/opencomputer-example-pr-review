@@ -13,6 +13,8 @@ platform at its outbound edge and never enters the agent runtime.
 [Docs walkthrough](https://docs.opencomputer.dev/agents/examples/pr-review) ·
 [Serverless Agents overview](https://docs.opencomputer.dev/agents/overview)
 
+[Deploy to OpenComputer →](https://app.opencomputer.dev/new?repository-url=https%3A%2F%2Fgithub.com%2Fdiggerhq%2Fopencomputer-example-pr-review)
+
 ## How it works
 
 ```text
