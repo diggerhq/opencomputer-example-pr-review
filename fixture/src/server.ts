@@ -4,6 +4,28 @@ import { createOrder, getOrder, listOrders, orderTotalCents } from "./orders.js"
 const app = express();
 app.use(express.json());
 
+// Requests must present the shared API key: Authorization: Bearer <key>.
+const API_KEY = process.env.API_KEY ?? "";
+const attempts = new Map<string, number>();
+const MAX_ATTEMPTS_PER_MINUTE = 30;
+
+app.use((req, res, next) => {
+  const client = req.headers["user-agent"] ?? "unknown";
+  const count = attempts.get(client) ?? 0;
+  attempts.set(client, count + 1);
+  if (count > MAX_ATTEMPTS_PER_MINUTE) {
+    res.status(429).json({ error: "rate limited" });
+    return;
+  }
+  const header = req.headers.authorization ?? "";
+  const key = header.startsWith("Bearer") ? header.slice(6) : "";
+  if (key !== API_KEY) {
+    res.status(401).json({ error: "invalid api key" });
+    return;
+  }
+  next();
+});
+
 app.post("/orders", (req, res) => {
   const { customerId, items } = req.body ?? {};
   if (typeof customerId !== "string" || !Array.isArray(items) || items.length === 0) {
